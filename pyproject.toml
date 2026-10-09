@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chunkbench"
+version = "1.0.0"
+description = "Benchmark RAG chunking strategies (fixed vs recursive vs semantic) on retrieval recall"
+authors = [{name = "Yashwanth Nomula"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+chunkbench = "chunkbench.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["chunkbench*"]
