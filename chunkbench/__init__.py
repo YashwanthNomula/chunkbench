@@ -13,6 +13,9 @@ _fixed.chunkbench_params = {"size": 500, "overlap": 50}  # type: ignore[attr-def
 _recursive = partial(chunkers.recursive_chunks, size=500, overlap=50)
 _recursive.chunkbench_params = {"size": 500, "overlap": 50}  # type: ignore[attr-defined]
 
+_overlap = partial(chunkers.overlap_chunks, size=500, overlap=100)
+_overlap.chunkbench_params = {"size": 500, "overlap": 100}  # type: ignore[attr-defined]
+
 _semantic = partial(chunkers.semantic_chunks, target=500, threshold=0.15)
 _semantic.chunkbench_params = {"target": 500, "threshold": 0.15}  # type: ignore[attr-defined]
 
@@ -20,6 +23,11 @@ STRATEGIES = {
     "fixed": (
         _fixed,
         "Sliding 500-char window with 50-char overlap. The naive baseline.",
+    ),
+    "overlap": (
+        _overlap,
+        "Sliding 500-char window with 100-char (20%) overlap. Same tiling as "
+        "fixed, but the wider overlap keeps boundary-straddling answers whole.",
     ),
     "recursive": (
         _recursive,

@@ -55,6 +55,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                 chunkers.recursive_chunks(text, size=_s, overlap=_o, doc_id=doc_id)
             )
             fn.chunkbench_params = {"size": args.size, "overlap": args.overlap}  # type: ignore[attr-defined]
+        elif name == "overlap":
+            overlap = args.overlap_chars if args.overlap_chars is not None else int(args.size * 0.2)
+            fn = lambda text, doc_id="", _s=args.size, _o=overlap: (  # noqa: E731
+                chunkers.overlap_chunks(text, size=_s, overlap=_o, doc_id=doc_id)
+            )
+            fn.chunkbench_params = {"size": args.size, "overlap": overlap}  # type: ignore[attr-defined]
         else:
             fn = lambda text, doc_id="", _t=args.size: (  # noqa: E731
                 chunkers.semantic_chunks(text, target=_t, doc_id=doc_id)
@@ -85,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_strategies)
 
     r = sub.add_parser("run", help="benchmark on a corpus (built-in or your own)")
-    r.add_argument("--strategy", default="fixed,recursive,semantic",
+    r.add_argument("--strategy", default="fixed,overlap,recursive,semantic",
                    help="comma-separated subset of strategies (default: all)")
     r.add_argument("--docs", default=None,
                    help="directory of .md files (default: built-in corpus)")
@@ -93,7 +99,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="questions JSON [{text, gold_doc, must_contain}]")
     r.add_argument("--size", type=int, default=500, help="chunk size in chars")
     r.add_argument("--overlap", type=int, default=50,
-                   help="overlap in chars (fixed strategy)")
+                   help="overlap in chars (fixed/recursive strategies)")
+    r.add_argument("--overlap-chars", type=int, default=None,
+                   help="overlap in chars for the overlap strategy "
+                   "(default: 20%% of --size)")
     r.add_argument("--json", action="store_true", help="emit JSON instead of table")
     r.set_defaults(func=cmd_run)
     return p

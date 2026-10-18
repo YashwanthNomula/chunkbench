@@ -15,6 +15,7 @@ def test_strategies_lists_all(capsys):
     assert main(["strategies"]) == 0
     out = capsys.readouterr().out
     assert "fixed" in out and "recursive" in out and "semantic" in out
+    assert "overlap" in out
 
 
 def test_run_subset_strategy(capsys):

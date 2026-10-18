@@ -1,9 +1,12 @@
 """Chunking strategies for chunkbench.
 
-Three strategies, one interface: each takes raw text and returns a list of
+Four strategies, one interface: each takes raw text and returns a list of
 :class:`Chunk` with exact character offsets back into the source document.
 
 * ``fixed``     - sliding character window with overlap (the naive baseline)
+* ``overlap``   - sliding character window with a large, configurable overlap
+                  (default 20% of the window) so answers straddling a
+                  boundary stay whole inside at least one chunk
 * ``recursive`` - split on the strongest boundary that fits (paragraph, line,
                   sentence, word), then greedily merge back up to ``size``
 * ``semantic``  - sentence-level greedy grouping that closes a chunk early on
@@ -43,6 +46,39 @@ def _check_size_overlap(size: int, overlap: int) -> None:
 def fixed_chunks(text: str, size: int = 500, overlap: int = 50,
                  doc_id: str = "") -> list[Chunk]:
     """Split text into fixed-size character windows with ``overlap`` reuse."""
+    _check_size_overlap(size, overlap)
+    chunks: list[Chunk] = []
+    n = len(text)
+    start = 0
+    while start < n:
+        end = min(start + size, n)
+        piece = text[start:end]
+        if piece.strip():
+            chunks.append(Chunk(doc_id, len(chunks), piece, start, end))
+        if end == n:
+            break
+        start = end - overlap
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# overlap: sliding window with a large, configurable overlap
+# ---------------------------------------------------------------------------
+
+def overlap_chunks(text: str, size: int = 500, overlap: int | None = None,
+                   doc_id: str = "") -> list[Chunk]:
+    """Split text into fixed-size windows sharing ``overlap`` chars.
+
+    Identical tiling to :func:`fixed_chunks` — consecutive windows share
+    exactly ``overlap`` characters, the first starts at 0, and the last ends
+    at ``len(text)`` — but the default overlap is 20% of the window instead
+    of ``fixed``'s 50 chars, so an answer straddling a boundary is far more
+    likely to sit whole inside at least one chunk. Pass ``overlap=0`` for
+    plain non-overlapping fixed chunking. ``overlap`` must satisfy
+    ``0 <= overlap < size``.
+    """
+    if overlap is None:
+        overlap = int(size * 0.2)
     _check_size_overlap(size, overlap)
     chunks: list[Chunk] = []
     n = len(text)
