@@ -83,6 +83,10 @@ chunkbench run --strategy overlap --overlap-chars 100
 
 # your own corpus: a directory of .md files + a questions JSON
 chunkbench run --docs ./my_docs --questions ./questions.json --json
+
+# sweep a grid of window sizes x overlap fractions, pick the best config
+chunkbench sweep --strategy fixed,overlap --sizes 250,500,1000 --overlaps 0,0.1,0.25
+chunkbench sweep --sizes 250,500,750,1000 --overlaps 0,0.25 --json
 ```
 
 Questions JSON format:
@@ -109,6 +113,33 @@ answers split across chunk boundaries count as misses.
 
 All chunks carry exact character offsets back into the source document, so
 results are auditable down to the span.
+
+## Sweep: find the best config per corpus
+
+`chunkbench sweep` runs the benchmark across a grid of window sizes and
+overlap fractions (fractions of the window — `0.25` means 25% overlap, so
+the grid stays meaningful as the window grows), ranks every config by
+recall@5 then MRR, and names the winner:
+
+```bash
+$ chunkbench sweep --strategy fixed,overlap --sizes 250,500,1000 --overlaps 0,0.1,0.25
+sweep: 18 configs (2 strategies x 3 sizes x 3 overlaps)
+
+strategy        size  overlap   recall@1   recall@3   recall@5     MRR  chunks
+--------------------------------------------------------------------------
+ * fixed        1000      100     0.600     0.900     0.900   0.875      16
+   overlap      1000      100     0.600     0.900     0.900   0.875      16
+   ...
+--------------------------------------------------------------------------
+best config: fixed size=1000 overlap=100 (recall@5 0.900, MRR 0.875, 16 chunks) — marked * above
+```
+
+The winner is a fact about *this* corpus, not a recommendation — larger
+windows dilute term weights in the ranker, so sweeping on your own corpus
+is the whole point. `semantic` sweeps over sizes only (overlap is n/a for
+it); grids over 200 runs are rejected so a typo never turns into an
+afternoon of benchmarking. `--json` emits every config's scores plus the
+best config as machine-readable data.
 
 ## Tests
 

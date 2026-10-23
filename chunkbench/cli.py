@@ -8,6 +8,9 @@ from . import STRATEGIES, __version__, chunkers
 from .corpus import DOCS, QUESTIONS, load_docs_dir, load_questions_json
 from .eval import evaluate
 from .report import render_json, render_terminal
+from .sweep import (MAX_RUNS, build_configs, parse_frac_list, parse_int_list,
+                    pick_best, render_sweep_json, render_sweep_terminal,
+                    run_sweep)
 
 KS = (1, 3, 5)
 
@@ -76,6 +79,45 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sweep(args: argparse.Namespace) -> int:
+    names = [s.strip() for s in args.strategy.split(",")]
+    unknown = [n for n in names if n not in STRATEGIES]
+    if unknown:
+        print(f"unknown strategy: {', '.join(unknown)}", file=sys.stderr)
+        print(f"choose from: {', '.join(STRATEGIES)}", file=sys.stderr)
+        return 2
+    try:
+        sizes = parse_int_list(args.sizes)
+        fracs = parse_frac_list(args.overlaps)
+    except ValueError as exc:
+        print(f"bad grid: {exc}", file=sys.stderr)
+        return 2
+    configs = build_configs(names, sizes, fracs)
+    if len(configs) > MAX_RUNS:
+        print(f"grid too large: {len(configs)} runs > {MAX_RUNS}; "
+              "narrow --sizes/--overlaps/--strategy", file=sys.stderr)
+        return 2
+    try:
+        docs = load_docs_dir(args.docs) if args.docs else DOCS
+        questions = load_questions_json(args.questions) if args.questions else QUESTIONS
+    except (ValueError, OSError) as exc:
+        print(f"bad input: {exc}", file=sys.stderr)
+        return 2
+    try:
+        rows = run_sweep(docs, questions, configs, ks=KS)
+    except ValueError as exc:
+        print(f"sweep failed: {exc}", file=sys.stderr)
+        return 2
+    best = pick_best(rows, KS)
+    print(f"sweep: {len(rows)} configs "
+          f"({len(names)} strategies x {len(sizes)} sizes x {len(fracs)} overlaps)\n")
+    if args.json:
+        print(render_sweep_json(rows, best, KS))
+    else:
+        print(render_sweep_terminal(rows, best, KS))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="chunkbench",
@@ -105,6 +147,21 @@ def build_parser() -> argparse.ArgumentParser:
                    "(default: 20%% of --size)")
     r.add_argument("--json", action="store_true", help="emit JSON instead of table")
     r.set_defaults(func=cmd_run)
+
+    w = sub.add_parser("sweep", help="sweep chunk sizes x overlap fractions")
+    w.add_argument("--strategy", default="fixed,overlap,recursive,semantic",
+                   help="comma-separated subset of strategies (default: all)")
+    w.add_argument("--sizes", default="250,500,1000",
+                   help="comma-separated chunk sizes in chars (default: 250,500,1000)")
+    w.add_argument("--overlaps", default="0,0.1,0.25",
+                   help="comma-separated overlap fractions of the window "
+                        "(default: 0,0.1,0.25); ignored for semantic")
+    w.add_argument("--docs", default=None,
+                   help="directory of .md files (default: built-in corpus)")
+    w.add_argument("--questions", default=None,
+                   help="questions JSON [{text, gold_doc, must_contain}]")
+    w.add_argument("--json", action="store_true", help="emit JSON instead of table")
+    w.set_defaults(func=cmd_sweep)
     return p
 
 
