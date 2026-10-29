@@ -13,6 +13,34 @@ from .sweep import (MAX_RUNS, build_configs, parse_frac_list, parse_int_list,
                     run_sweep)
 
 KS = (1, 3, 5)
+MAX_K = 10
+
+
+def parse_ks(spec: str) -> tuple[int, ...]:
+    """Parse a comma-separated list of recall cutoffs, fail-closed.
+
+    Retrieval only ranks the top 10, so recall@k beyond 10 would be
+    misleading and is rejected rather than silently clamped.
+    """
+    if spec is None:
+        raise ValueError("empty --ks value")
+    parts = [p.strip() for p in spec.split(",")]
+    if not parts or any(p == "" for p in parts):
+        raise ValueError(f"empty value in --ks {spec!r}")
+    values = []
+    for p in parts:
+        try:
+            v = int(p)
+        except ValueError:
+            raise ValueError(f"not an integer in --ks: {p!r}") from None
+        if v <= 0:
+            raise ValueError(f"recall cutoffs must be positive: {p!r}")
+        if v > MAX_K:
+            raise ValueError(
+                f"recall cutoff {v} exceeds top-10 retrieval limit"
+            )
+        values.append(v)
+    return tuple(sorted(set(values)))
 
 
 def cmd_demo(_args: argparse.Namespace) -> int:
@@ -37,6 +65,11 @@ def cmd_strategies(_args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    try:
+        ks = parse_ks(getattr(args, "ks", "1,3,5"))
+    except ValueError as exc:
+        print(f"bad --ks: {exc}", file=sys.stderr)
+        return 2
     docs = load_docs_dir(args.docs) if args.docs else DOCS
     questions = load_questions_json(args.questions) if args.questions else QUESTIONS
     names = [s.strip() for s in args.strategy.split(",")]
@@ -71,11 +104,11 @@ def cmd_run(args: argparse.Namespace) -> int:
             fn.chunkbench_params = {"target": args.size, "threshold": 0.15}  # type: ignore[attr-defined]
         strategies[name] = fn
 
-    results = evaluate(docs, questions, strategies, ks=KS)
+    results = evaluate(docs, questions, strategies, ks=ks)
     if args.json:
-        print(render_json(results))
+        print(render_json(results, ks))
     else:
-        print(render_terminal(results, KS))
+        print(render_terminal(results, ks))
     return 0
 
 
@@ -145,6 +178,9 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--overlap-chars", type=int, default=None,
                    help="overlap in chars for the overlap strategy "
                    "(default: 20%% of --size)")
+    r.add_argument("--ks", default="1,3,5",
+                   help="comma-separated recall cutoffs (default: 1,3,5; "
+                        "each must be 1-10, retrieval ranks top 10)")
     r.add_argument("--json", action="store_true", help="emit JSON instead of table")
     r.set_defaults(func=cmd_run)
 

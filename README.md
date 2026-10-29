@@ -81,6 +81,9 @@ chunkbench run --strategy recursive --size 800
 # overlap strategy with a custom overlap (default: 20% of --size)
 chunkbench run --strategy overlap --overlap-chars 100
 
+# custom recall cutoffs (default: 1,3,5; each must be 1-10, since retrieval ranks top 10)
+chunkbench run --ks 1,10
+
 # your own corpus: a directory of .md files + a questions JSON
 chunkbench run --docs ./my_docs --questions ./questions.json --json
 

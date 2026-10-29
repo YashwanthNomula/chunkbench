@@ -41,12 +41,15 @@ def render_terminal(results: list[StrategyResult], ks: tuple[int, ...]) -> str:
     return "\n".join(lines)
 
 
-def render_json(results: list[StrategyResult]) -> str:
+def render_json(results: list[StrategyResult],
+                ks: tuple[int, ...] | None = None) -> str:
     payload = [
         {
             "strategy": r.strategy,
             "params": r.params,
-            "recall_at": {str(k): v for k, v in r.recall_at.items()},
+            "recall_at": {str(k): r.recall_at[k] for k in ks}
+            if ks is not None else
+            {str(k): v for k, v in r.recall_at.items()},
             "mrr": r.mrr,
             "n_chunks": r.n_chunks,
             "avg_chunk_chars": r.avg_chunk_chars,
